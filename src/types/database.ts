@@ -33,8 +33,8 @@ export interface Message {
   created_at: string;
 }
 
-export const ROLE_META: Record<FounderRole, { emoji: string; description: string }> = {
-  Technical: { emoji: "\u{1F4BB}", description: "I build things" },
-  Sales: { emoji: "\u{1F4C8}", description: "I sell things" },
-  Idea: { emoji: "\u{1F4A1}", description: "I dream things" },
+export const ROLE_META: Record<FounderRole, { icon: string; description: string }> = {
+  Technical: { icon: "Monitor", description: "I build things" },
+  Sales: { icon: "TrendingUp", description: "I sell things" },
+  Idea: { icon: "Lightbulb", description: "I dream things" },
 };

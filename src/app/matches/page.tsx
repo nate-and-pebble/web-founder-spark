@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
-import { type Match, type Profile, ROLE_META, type FounderRole } from "@/types/database";
+import { type Match, type Profile } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
+import { Avatar } from "@/components/avatar";
+import { Sparkles, ChevronRight } from "lucide-react";
 
 interface MatchWithProfile {
   match: Match;
@@ -74,7 +76,7 @@ export default function MatchesPage() {
           </div>
         ) : matches.length === 0 ? (
           <div className="text-center py-16 space-y-3">
-            <p className="text-4xl">{"💫"}</p>
+            <Sparkles className="h-10 w-10 mx-auto text-zinc-400" />
             <p className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
               No matches yet
             </p>
@@ -96,9 +98,7 @@ export default function MatchesPage() {
                 href={`/chat/${match.id}`}
                 className="flex items-center gap-4 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 hover:border-orange-300 dark:hover:border-orange-600 transition-colors"
               >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-xl">
-                  {ROLE_META[profile.role as FounderRole]?.emoji ?? "🚀"}
-                </div>
+                <Avatar url={profile.avatar_url} name={profile.display_name} />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-zinc-900 dark:text-white truncate">
                     {profile.display_name}
@@ -107,7 +107,7 @@ export default function MatchesPage() {
                     {profile.role}
                   </p>
                 </div>
-                <span className="text-zinc-400 text-sm">{"›"}</span>
+                <ChevronRight className="h-4 w-4 text-zinc-400" />
               </Link>
             ))}
           </div>

@@ -3,7 +3,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { type Message, type Profile, ROLE_META, type FounderRole } from "@/types/database";
+import { type Message, type Profile } from "@/types/database";
+import { Avatar } from "@/components/avatar";
+import { ArrowLeft, ArrowUp } from "lucide-react";
 
 export default function ChatPage() {
   const { matchId } = useParams<{ matchId: string }>();
@@ -26,7 +28,6 @@ export default function ChatPage() {
       if (!user) return;
       setUserId(user.id);
 
-      // Get match
       const { data: match } = await supabase
         .from("matches")
         .select("*")
@@ -38,7 +39,6 @@ export default function ChatPage() {
         return;
       }
 
-      // Verify user is part of this match
       if (match.user_a !== user.id && match.user_b !== user.id) {
         router.push("/matches");
         return;
@@ -55,7 +55,6 @@ export default function ChatPage() {
 
       setOtherProfile(profile);
 
-      // Load messages
       const { data: msgs } = await supabase
         .from("messages")
         .select("*")
@@ -73,7 +72,6 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Poll for new messages every 3s
   useEffect(() => {
     if (!matchId) return;
     const interval = setInterval(async () => {
@@ -118,13 +116,11 @@ export default function ChatPage() {
           onClick={() => router.push("/matches")}
           className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          {"←"}
+          <ArrowLeft className="h-5 w-5" />
         </button>
         {otherProfile && (
           <>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-sm">
-              {ROLE_META[otherProfile.role as FounderRole]?.emoji ?? "🚀"}
-            </div>
+            <Avatar url={otherProfile.avatar_url} name={otherProfile.display_name} size="sm" />
             <div>
               <p className="font-semibold text-sm text-zinc-900 dark:text-white">
                 {otherProfile.display_name}
@@ -187,7 +183,7 @@ export default function ChatPage() {
             disabled={!text.trim() || sending}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-600 text-white disabled:opacity-40 hover:bg-orange-700 transition-colors"
           >
-            {"↑"}
+            <ArrowUp className="h-4 w-4" />
           </button>
         </div>
       </div>

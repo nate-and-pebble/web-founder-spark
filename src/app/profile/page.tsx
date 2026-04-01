@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { type Profile, type FounderRole, ROLE_META } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
+import { RoleIcon } from "@/components/role-icon";
+import { Avatar } from "@/components/avatar";
+import { Camera } from "lucide-react";
 
 const ROLES: FounderRole[] = ["Technical", "Sales", "Idea"];
 
@@ -12,9 +15,12 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [role, setRole] = useState<FounderRole>("Idea");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -35,11 +41,50 @@ export default function ProfilePage() {
         setDisplayName(data.display_name);
         setBio(data.bio);
         setRole(data.role as FounderRole);
+        setAvatarUrl(data.avatar_url);
       }
       setLoading(false);
     }
     load();
   }, []);
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 2 * 1024 * 1024) return; // 2MB max
+
+    setUploading(true);
+    const supabase = createClient();
+    const ext = file.name.split(".").pop();
+    const path = `${profile.id}/avatar.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true });
+
+    if (uploadErr) {
+      console.error("Upload error:", uploadErr);
+      setUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(path);
+
+    const publicUrl = urlData.publicUrl + "?t=" + Date.now();
+
+    await supabase
+      .from("profiles")
+      .update({ avatar_url: urlData.publicUrl })
+      .eq("id", profile.id);
+
+    setAvatarUrl(publicUrl);
+    setUploading(false);
+  }
 
   async function handleSave() {
     if (!profile) return;
@@ -74,6 +119,36 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="max-w-sm mx-auto space-y-5">
+            {/* Avatar Upload */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="relative group"
+                disabled={uploading}
+              >
+                <Avatar url={avatarUrl} name={displayName} size="lg" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="h-6 w-6 text-white" />
+                </div>
+                {uploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
+            <p className="text-center text-xs text-zinc-400">
+              Tap to upload photo
+            </p>
+
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Display Name
@@ -102,7 +177,7 @@ export default function ProfilePage() {
                         : "border-zinc-200 dark:border-zinc-700"
                     }`}
                   >
-                    <span className="text-xl">{ROLE_META[r].emoji}</span>
+                    <RoleIcon role={r} className="h-5 w-5 mx-auto text-orange-600 dark:text-orange-400" />
                     <p className="mt-1 text-xs font-medium text-zinc-700 dark:text-zinc-300">
                       {r}
                     </p>

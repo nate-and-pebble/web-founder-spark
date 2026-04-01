@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
 import { type FounderRole, ROLE_META } from "@/types/database";
+import { RoleIcon } from "@/components/role-icon";
 
 const ROLES: FounderRole[] = ["Technical", "Sales", "Idea"];
 
@@ -71,7 +72,7 @@ export default function OnboardingPage() {
                 }}
                 className="flex items-center gap-4 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-5 text-left hover:border-orange-400 dark:hover:border-orange-500 transition-colors"
               >
-                <span className="text-3xl">{ROLE_META[role].emoji}</span>
+                <RoleIcon role={role} className="h-8 w-8 text-orange-600 dark:text-orange-400" />
                 <div>
                   <p className="font-semibold text-zinc-900 dark:text-white">
                     {role}
@@ -92,7 +93,7 @@ export default function OnboardingPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <span className="text-4xl">{ROLE_META[selectedRole!].emoji}</span>
+          <RoleIcon role={selectedRole!} className="h-10 w-10 mx-auto text-orange-600 dark:text-orange-400" />
           <h1 className="mt-2 text-2xl font-bold text-zinc-900 dark:text-white">
             Set up your profile
           </h1>

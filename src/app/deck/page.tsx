@@ -2,8 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import { type Profile, ROLE_META, type FounderRole } from "@/types/database";
+import { type Profile, type FounderRole } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
+import { RoleIcon } from "@/components/role-icon";
+import { Avatar } from "@/components/avatar";
+import { Search, Zap, RefreshCw } from "lucide-react";
 
 export default function DeckPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -24,7 +27,6 @@ export default function DeckPage() {
       if (!user) return;
       setUserId(user.id);
 
-      // Get already-swiped profile IDs
       const { data: existingSwipes } = await supabase
         .from("swipes")
         .select("swiped_id")
@@ -33,7 +35,7 @@ export default function DeckPage() {
       const swipedIds = new Set(
         (existingSwipes ?? []).map((s: { swiped_id: string }) => s.swiped_id)
       );
-      swipedIds.add(user.id); // exclude self
+      swipedIds.add(user.id);
       setSwiped(swipedIds);
 
       const { data } = await supabase
@@ -56,19 +58,16 @@ export default function DeckPage() {
       const profile = profiles[currentIndex];
       setSwipeDirection(direction === "like" ? "right" : "left");
 
-      // Animate out, then advance
       setTimeout(async () => {
         setSwipeDirection(null);
         setCurrentIndex((i) => i + 1);
 
-        // Record swipe
         await supabase.from("swipes").insert({
           swiper_id: userId,
           swiped_id: profile.id,
           direction,
         });
 
-        // Check for match if liked
         if (direction === "like") {
           const { data: matches } = await supabase
             .from("matches")
@@ -100,15 +99,16 @@ export default function DeckPage() {
           <div className="animate-pulse text-zinc-400">Loading profiles...</div>
         ) : done ? (
           <div className="text-center space-y-3">
-            <p className="text-4xl">{"🔍"}</p>
+            <Search className="h-10 w-10 mx-auto text-zinc-400" />
             <p className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
               No more founders
             </p>
             <p className="text-sm text-zinc-500">Check back later!</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-2 text-sm text-orange-600 hover:text-orange-700"
+              className="mt-2 inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700"
             >
+              <RefreshCw className="h-3.5 w-3.5" />
               Refresh
             </button>
           </div>
@@ -125,9 +125,15 @@ export default function DeckPage() {
             >
               {/* Card Header */}
               <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-6 text-center text-white">
-                <span className="text-5xl">
-                  {ROLE_META[currentProfile.role as FounderRole]?.emoji ?? "🚀"}
-                </span>
+                {currentProfile.avatar_url ? (
+                  <img
+                    src={currentProfile.avatar_url}
+                    alt={currentProfile.display_name}
+                    className="h-16 w-16 rounded-full object-cover mx-auto border-2 border-white/30"
+                  />
+                ) : (
+                  <RoleIcon role={currentProfile.role} className="h-12 w-12 mx-auto" />
+                )}
                 <h2 className="mt-3 text-xl font-bold">
                   {currentProfile.display_name}
                 </h2>
@@ -154,9 +160,9 @@ export default function DeckPage() {
                 <div className="w-px bg-zinc-200 dark:bg-zinc-700" />
                 <button
                   onClick={() => handleSwipe("like")}
-                  className="flex-1 py-4 text-center font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                  className="flex-1 py-4 text-center font-semibold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors inline-flex items-center justify-center gap-1"
                 >
-                  {"⚡"} Like
+                  <Zap className="h-4 w-4" /> Like
                 </button>
               </div>
             </div>
@@ -171,7 +177,7 @@ export default function DeckPage() {
         {matchAlert && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
             <div className="w-full max-w-xs rounded-2xl bg-white dark:bg-zinc-800 p-6 text-center shadow-2xl">
-              <p className="text-4xl">{"⚡"}</p>
+              <Zap className="h-10 w-10 mx-auto text-orange-500" />
               <h3 className="mt-3 text-xl font-bold text-zinc-900 dark:text-white">
                 It&apos;s a Match!
               </h3>
