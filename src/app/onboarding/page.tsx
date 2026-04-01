@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createProfile } from "@/lib/actions";
 import { type FounderRole, ROLE_META } from "@/types/database";
 import { RoleIcon } from "@/components/role-icon";
+import { Avatar } from "@/components/avatar";
+import { Camera } from "lucide-react";
 
 const ROLES: FounderRole[] = ["Technical", "Sales", "Idea"];
 
@@ -14,8 +16,43 @@ export default function OnboardingPage() {
   const [selectedRole, setSelectedRole] = useState<FounderRole | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image must be under 2 MB.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/avatar", { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Upload failed");
+      setUploading(false);
+      return;
+    }
+
+    setAvatarUrl(data.url);
+    setUploading(false);
+  }
 
   async function handleCreateProfile() {
     if (!selectedRole || !displayName.trim()) return;
@@ -26,6 +63,7 @@ export default function OnboardingPage() {
       display_name: displayName.trim(),
       role: selectedRole,
       bio: bio.trim(),
+      avatar_url: avatarUrl,
     });
 
     if (result.error) {
@@ -91,6 +129,36 @@ export default function OnboardingPage() {
         </div>
 
         <div className="space-y-4">
+          {/* Optional Photo Upload */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="relative group"
+              disabled={uploading}
+            >
+              <Avatar url={avatarUrl} name={displayName} size="lg" />
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="h-6 w-6 text-white" />
+              </div>
+              {uploading && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+            <p className="text-xs text-zinc-400">
+              Add a photo (optional)
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Display Name

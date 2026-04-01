@@ -34,6 +34,7 @@ export async function createProfile(input: {
   display_name: string;
   role: string;
   bio: string;
+  avatar_url?: string | null;
 }): Promise<{ error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "Not authenticated" };
@@ -44,6 +45,7 @@ export async function createProfile(input: {
     role: input.role,
     bio: input.bio,
     owner_user_id: user.id,
+    ...(input.avatar_url ? { avatar_url: input.avatar_url } : {}),
   });
 
   return error ? { error: error.message } : {};
@@ -95,6 +97,7 @@ export async function getDeckProfiles(): Promise<{
   const { data } = await supabaseAdmin
     .from("profiles")
     .select("*")
+    .order("is_seeded", { ascending: true })
     .limit(50);
 
   const filtered = (data ?? []).filter(
