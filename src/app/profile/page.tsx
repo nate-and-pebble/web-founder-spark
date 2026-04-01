@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import { type Profile, type FounderRole, ROLE_META } from "@/types/database";
+import { type FounderRole, ROLE_META } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
 import { RoleIcon } from "@/components/role-icon";
 import { Avatar } from "@/components/avatar";
@@ -11,7 +11,7 @@ import { Camera } from "lucide-react";
 const ROLES: FounderRole[] = ["Technical", "Sales", "Idea"];
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [role, setRole] = useState<FounderRole>("Idea");
@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,6 +31,8 @@ export default function ProfilePage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      setUserId(user.id);
+
       const { data } = await supabase
         .from("profiles")
         .select("*")
@@ -37,7 +40,6 @@ export default function ProfilePage() {
         .single();
 
       if (data) {
-        setProfile(data);
         setDisplayName(data.display_name);
         setBio(data.bio);
         setRole(data.role as FounderRole);
@@ -50,16 +52,22 @@ export default function ProfilePage() {
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !profile) return;
+    if (!file || !userId) return;
 
-    // Validate file
-    if (!file.type.startsWith("image/")) return;
-    if (file.size > 2 * 1024 * 1024) return; // 2MB max
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image must be under 2 MB.");
+      return;
+    }
 
     setUploading(true);
+    setError(null);
     const supabase = createClient();
-    const ext = file.name.split(".").pop();
-    const path = `${profile.id}/avatar.${ext}`;
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${userId}/avatar.${ext}`;
 
     const { error: uploadErr } = await supabase.storage
       .from("avatars")
@@ -67,6 +75,7 @@ export default function ProfilePage() {
 
     if (uploadErr) {
       console.error("Upload error:", uploadErr);
+      setError(`Upload failed: ${uploadErr.message}`);
       setUploading(false);
       return;
     }
@@ -75,31 +84,46 @@ export default function ProfilePage() {
       .from("avatars")
       .getPublicUrl(path);
 
-    const publicUrl = urlData.publicUrl + "?t=" + Date.now();
+    const publicUrl = urlData.publicUrl;
 
-    await supabase
+    const { error: saveErr } = await supabase
       .from("profiles")
-      .update({ avatar_url: urlData.publicUrl })
-      .eq("id", profile.id);
+      .upsert(
+        { id: userId, avatar_url: publicUrl, display_name: displayName.trim() || "Anonymous", bio: bio.trim(), role },
+        { onConflict: "id" }
+      );
 
-    setAvatarUrl(publicUrl);
+    if (saveErr) {
+      console.error("Avatar save error:", saveErr);
+      setError(`Failed to save avatar: ${saveErr.message}`);
+      setUploading(false);
+      return;
+    }
+
+    setAvatarUrl(publicUrl + "?t=" + Date.now());
     setUploading(false);
   }
 
   async function handleSave() {
-    if (!profile) return;
+    if (!userId || !displayName.trim()) return;
     setSaving(true);
     setSaved(false);
+    setError(null);
 
     const supabase = createClient();
-    await supabase
+    const { error: saveErr } = await supabase
       .from("profiles")
-      .update({
-        display_name: displayName.trim(),
-        bio: bio.trim(),
-        role,
-      })
-      .eq("id", profile.id);
+      .upsert(
+        { id: userId, display_name: displayName.trim(), bio: bio.trim(), role },
+        { onConflict: "id" }
+      );
+
+    if (saveErr) {
+      console.error("Profile save error:", saveErr);
+      setError(`Save failed: ${saveErr.message}`);
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
     setSaved(true);
@@ -148,6 +172,12 @@ export default function ProfilePage() {
             <p className="text-center text-xs text-zinc-400">
               Tap to upload photo
             </p>
+
+            {error && (
+              <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+                {error}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
