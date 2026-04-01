@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase-browser";
+import { createProfile } from "@/lib/actions";
 import { type FounderRole, ROLE_META } from "@/types/database";
 import { RoleIcon } from "@/components/role-icon";
 
@@ -22,26 +22,14 @@ export default function OnboardingPage() {
     setLoading(true);
     setError("");
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Not authenticated");
-      setLoading(false);
-      return;
-    }
-
-    const { error: err } = await supabase.from("profiles").insert({
-      id: user.id,
+    const result = await createProfile({
       display_name: displayName.trim(),
       role: selectedRole,
       bio: bio.trim(),
     });
 
-    if (err) {
-      setError(err.message);
+    if (result.error) {
+      setError(result.error);
       setLoading(false);
       return;
     }

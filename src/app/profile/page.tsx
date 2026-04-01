@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { createClient } from "@/lib/supabase-browser";
+import { getSessionUser, getProfile, upsertProfile } from "@/lib/actions";
 import { type FounderRole, ROLE_META } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
 import { RoleIcon } from "@/components/role-icon";
@@ -25,20 +25,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       if (!user) return;
 
       setUserId(user.id);
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
+      const data = await getProfile(user.id);
       if (data) {
         setDisplayName(data.display_name);
         setBio(data.bio);
@@ -65,37 +57,30 @@ export default function ProfilePage() {
 
     setUploading(true);
     setError(null);
-    const supabase = createClient();
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const path = `${userId}/avatar.${ext}`;
 
-    const { error: uploadErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true });
+    const formData = new FormData();
+    formData.append("file", file);
 
-    if (uploadErr) {
-      console.error("Upload error:", uploadErr);
-      setError(`Upload failed: ${uploadErr.message}`);
+    const res = await fetch("/api/avatar", { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Upload failed");
       setUploading(false);
       return;
     }
 
-    const { data: urlData } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(path);
+    const publicUrl = data.url;
 
-    const publicUrl = urlData.publicUrl;
+    const result = await upsertProfile({
+      display_name: displayName.trim() || "Anonymous",
+      bio: bio.trim(),
+      role,
+      avatar_url: publicUrl,
+    });
 
-    const { error: saveErr } = await supabase
-      .from("profiles")
-      .upsert(
-        { id: userId, avatar_url: publicUrl, display_name: displayName.trim() || "Anonymous", bio: bio.trim(), role },
-        { onConflict: "id" }
-      );
-
-    if (saveErr) {
-      console.error("Avatar save error:", saveErr);
-      setError(`Failed to save avatar: ${saveErr.message}`);
+    if (result.error) {
+      setError(`Failed to save avatar: ${result.error}`);
       setUploading(false);
       return;
     }
@@ -110,17 +95,14 @@ export default function ProfilePage() {
     setSaved(false);
     setError(null);
 
-    const supabase = createClient();
-    const { error: saveErr } = await supabase
-      .from("profiles")
-      .upsert(
-        { id: userId, display_name: displayName.trim(), bio: bio.trim(), role },
-        { onConflict: "id" }
-      );
+    const result = await upsertProfile({
+      display_name: displayName.trim(),
+      bio: bio.trim(),
+      role,
+    });
 
-    if (saveErr) {
-      console.error("Profile save error:", saveErr);
-      setError(`Save failed: ${saveErr.message}`);
+    if (result.error) {
+      setError(`Save failed: ${result.error}`);
       setSaving(false);
       return;
     }

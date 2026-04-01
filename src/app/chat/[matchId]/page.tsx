@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase-browser";
+import { getChatData, sendMessage, pollMessages } from "@/lib/actions";
 import { type Message, type Profile } from "@/types/database";
 import { Avatar } from "@/components/avatar";
 import { ArrowLeft, ArrowUp } from "lucide-react";
@@ -18,55 +18,20 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const supabase = createClient();
-
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-
-      const { data: match } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("id", matchId)
-        .single();
-
-      if (!match) {
+      const data = await getChatData(matchId);
+      if (!data || !data.authorized) {
         router.push("/matches");
         return;
       }
-
-      if (match.user_a !== user.id && match.user_b !== user.id) {
-        router.push("/matches");
-        return;
-      }
-
-      const otherId =
-        match.user_a === user.id ? match.user_b : match.user_a;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", otherId)
-        .single();
-
-      setOtherProfile(profile);
-
-      const { data: msgs } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("match_id", matchId)
-        .order("created_at", { ascending: true });
-
-      setMessages(msgs ?? []);
+      setUserId(data.userId);
+      setOtherProfile(data.otherProfile);
+      setMessages(data.messages);
       setLoading(false);
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId]);
+  }, [matchId, router]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,15 +40,10 @@ export default function ChatPage() {
   useEffect(() => {
     if (!matchId) return;
     const interval = setInterval(async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("match_id", matchId)
-        .order("created_at", { ascending: true });
-      if (data) setMessages(data);
+      const msgs = await pollMessages(matchId);
+      if (msgs.length > 0) setMessages(msgs);
     }, 3000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId]);
 
   async function handleSend() {
@@ -92,16 +52,7 @@ export default function ChatPage() {
     const body = text.trim();
     setText("");
 
-    const { data: msg } = await supabase
-      .from("messages")
-      .insert({
-        match_id: matchId,
-        sender_id: userId,
-        body,
-      })
-      .select()
-      .single();
-
+    const msg = await sendMessage({ match_id: matchId, body });
     if (msg) {
       setMessages((prev) => [...prev, msg]);
     }

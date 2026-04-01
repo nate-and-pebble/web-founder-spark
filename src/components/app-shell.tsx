@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase-browser";
 import { Zap, MessageCircle, User, LogOut } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -22,8 +21,7 @@ export function AppShell({
   const router = useRouter();
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");
   }
 

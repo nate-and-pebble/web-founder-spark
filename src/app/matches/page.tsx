@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
+import { getMatches } from "@/lib/actions";
 import { type Match, type Profile } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
@@ -19,44 +19,7 @@ export default function MatchesPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: matchRows } = await supabase
-        .from("matches")
-        .select("*")
-        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .order("created_at", { ascending: false });
-
-      if (!matchRows || matchRows.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      const otherIds = matchRows.map((m: Match) =>
-        m.user_a === user.id ? m.user_b : m.user_a
-      );
-
-      const { data: profileRows } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", otherIds);
-
-      const profileMap = new Map(
-        (profileRows ?? []).map((p: Profile) => [p.id, p])
-      );
-
-      const results: MatchWithProfile[] = matchRows
-        .map((m: Match) => {
-          const otherId = m.user_a === user.id ? m.user_b : m.user_a;
-          const profile = profileMap.get(otherId);
-          return profile ? { match: m, profile } : null;
-        })
-        .filter(Boolean) as MatchWithProfile[];
-
+      const results = await getMatches();
       setMatches(results);
       setLoading(false);
     }

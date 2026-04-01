@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createClient } from "@/lib/supabase-browser";
+import { getDeckProfiles, recordSwipe } from "@/lib/actions";
 import { type Profile } from "@/types/database";
 import { AppShell } from "@/components/app-shell";
 import { RoleIcon } from "@/components/role-icon";
@@ -175,37 +175,15 @@ export default function DeckPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [matchAlert, setMatchAlert] = useState<Profile | null>(null);
 
-  const supabase = createClient();
-
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-
-      const { data: existingSwipes } = await supabase
-        .from("swipes")
-        .select("swiped_id")
-        .eq("swiper_id", user.id);
-
-      const swipedIds = new Set(
-        (existingSwipes ?? []).map((s: { swiped_id: string }) => s.swiped_id)
-      );
-      swipedIds.add(user.id);
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .limit(50);
-
-      const filtered = (data ?? []).filter((p: Profile) => !swipedIds.has(p.id));
-      setProfiles(filtered);
+      const result = await getDeckProfiles();
+      if (!result) return;
+      setUserId(result.userId);
+      setProfiles(result.profiles);
       setLoading(false);
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSwipe = useCallback(
@@ -215,30 +193,16 @@ export default function DeckPage() {
       const profile = profiles[currentIndex];
       setCurrentIndex((i) => i + 1);
 
-      await supabase.from("swipes").insert({
-        swiper_id: userId,
+      const result = await recordSwipe({
         swiped_id: profile.id,
         direction,
       });
 
-      if (direction === "like") {
-        const { data: matches } = await supabase
-          .from("matches")
-          .select("*")
-          .or(`user_a.eq.${userId},user_b.eq.${userId}`)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (
-          matches?.[0] &&
-          (matches[0].user_a === profile.id ||
-            matches[0].user_b === profile.id)
-        ) {
-          setMatchAlert(profile);
-        }
+      if (result.matchProfile) {
+        setMatchAlert(result.matchProfile);
       }
     },
-    [userId, currentIndex, profiles, supabase]
+    [userId, currentIndex, profiles]
   );
 
   const triggerSwipe = (dir: "like" | "pass") => {
