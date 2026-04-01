@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").split("\n")[0].trim();
-const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").split("\n")[0].trim();
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().split(/\s/)[0];
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim().split(/\s/)[0];
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
